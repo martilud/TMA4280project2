@@ -1,0 +1,1 @@
+/usr/bin/c++   -fopenmp -O2 -lpthread -Wall -Wextra -Wpedantic -std=c++11  -rdynamic CMakeFiles/project2.dir/src/main.cpp.o  -o project2/project2 -Wl,-rpath,/home/harald/.openmpi/lib /home/harald/.openmpi/lib/libmpi.so 

@@ -1,0 +1,3 @@
+/home/harald/TMA4280project2/build/CMakeFiles/rebuild_cache.dir
+/home/harald/TMA4280project2/build/CMakeFiles/project2.dir
+/home/harald/TMA4280project2/build/CMakeFiles/edit_cache.dir
