@@ -1,0 +1,3 @@
+Man må ha en fil for at git skal lage en mappe. 
+
+Derfor kan denne filen slettes når du cloner prosjektet!
