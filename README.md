@@ -1,4 +1,4 @@
-# TMA4280 -Project 1
+# TMA4280 -Project 2
 Repository for the assignments in the course TMA4280 - Introduction to Super Computing
 
 ## User guide
