@@ -1,45 +1,53 @@
-# 
-# Specify minimum CMake version and project name
-#
-cmake_minimum_required(VERSION 2.8)
-project(project2)
+project(poisson)
 
-#
-# CMake setup
-#
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set (CMAKE_VERBOSE_MAKEFILE 0) # 1 should be used for debugging
-set (CMAKE_SUPPRESS_REGENERATION TRUE) # Suppress ZERO_CHECK
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O2 -lpthread -Wall -Wextra -Wpedantic -std=c++11")
+cmake_minimum_required(VERSION 2.6)
 
-find_package(MPI)
+enable_language(C)
+enable_language(Fortran)
 
-#
-# Set include paths
-#
-include_directories (src/ ${MPI_INCLUDE_PATH})
+# CMake Options to enable/disable MPI and OpenMP
+option(ENABLE_OPENMP "Enable OpenMP support?" ON)
+option(ENABLE_MPI    "Enable MPI support?" ON)
 
-#
-# Add files
-#
-file (GLOB_RECURSE PROJECT_HEADERS src/*.hpp
-								   src/*.h)
-file (GLOB_RECURSE PROJECT_SOURCES src/*.cpp)
-file (GLOB 		   PROJECT_CONFIGS CMakeLists.txt
-								   README.rst
-								   .gitignore
-								   .gitmodules)
+if(ENABLE_MPI)
+  find_package(MPI)
+endif()
 
-#
-# Organizing files
-#
-source_group ("headers" FILES ${PROJECT_HEADERS})
-source_group ("sources" FILES ${PROJECT_SOURCES})
+if(MPI_FOUND)
+  add_definitions(-DHAVE_MPI=1)
+  set(INCLUDES ${INCLUDES} ${MPI_INCLUDE_PATH})
+  set(DEPLIBS_C ${DEPLIBS_C} ${MPI_C_LIBRARIES})
+  set(DEPLIBS_F ${DEPLIBS_F} ${MPI_Fortran_LIBRARIES})
+endif()
 
-#
-# Set executable and target link libraries
-#
-add_definitions (-DPROJECT_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\")
-add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_CONFIGS})
-target_link_libraries (${PROJECT_NAME} ${MPI_C_LIBRARIES})
-set_target_properties (${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})
+if(ENABLE_OPENMP)
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    add_definitions(-DHAVE_OPENMP=1)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  endif()
+endif()
+
+# Use C99
+set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+
+# Send the include directories to the compiler
+include_directories(${INCLUDES})
+
+# Add a library with common sources
+add_library(common src/fst.f)
+
+# The C based poisson application
+add_executable(poisson src/poisson.c)
+
+# The Fortran based poisson application
+add_executable(poisson-f src/poisson.f90)
+
+# Link to libraries
+target_link_libraries(poisson common ${DEPLIBS_C})
+
+# We want to link this as a C program
+set_target_properties(poisson PROPERTIES LINKER_LANGUAGE C)
+
+# Link to libraries
+target_link_libraries(poisson-f common ${DEPLIBS_F})
