@@ -3,6 +3,7 @@ project(poisson)
 cmake_minimum_required(VERSION 2.6)
 
 enable_language(C)
+enable_language(CXX)
 enable_language(Fortran)
 
 # CMake Options to enable/disable MPI and OpenMP
@@ -40,8 +41,8 @@ add_library(common src/fst.f)
 # The C based poisson application
 add_executable(poisson src/poisson.c)
 
-# The Fortran based poisson application
-add_executable(poisson-f src/poisson.f90)
+# The C++ based poisson application
+add_executable(poisson-cpp src/poisson.cpp)
 
 # Link to libraries
 target_link_libraries(poisson common ${DEPLIBS_C})
@@ -49,5 +50,15 @@ target_link_libraries(poisson common ${DEPLIBS_C})
 # We want to link this as a C program
 set_target_properties(poisson PROPERTIES LINKER_LANGUAGE C)
 
+target_link_libraries(poisson-cpp common ${DEPLIBS_C})
+
+set_target_properties(poisson-cpp PROPERTIES LINGER_LANGUAGE CXX)
+
+
+## FORTRAN, WHICH WILL NOT BE USED ##
+
+# The Fortran based poisson application
+# add_executable(poisson-f src/poisson.f90)
+
 # Link to libraries
-target_link_libraries(poisson-f common ${DEPLIBS_F})
+# target_link_libraries(poisson-f common ${DEPLIBS_F})
