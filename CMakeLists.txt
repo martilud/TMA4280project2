@@ -38,21 +38,23 @@ include_directories(${INCLUDES})
 # Add a library with common sources
 add_library(common src/fst.f)
 
-# The C based poisson application
-add_executable(poisson src/poisson.c)
-
 # The C++ based poisson application
-add_executable(poisson-cpp src/poisson.cpp)
+add_executable(poisson src/poisson.cpp)
 
-# Link to libraries
 target_link_libraries(poisson common ${DEPLIBS_C})
 
+set_target_properties(poisson PROPERTIES LINKER_LANGUAGE CXX)
+
+## C, NOT USED ##
+
+# The C based poisson application
+# add_executable(poisson src/poisson.c)
+
+# Link to libraries
+#target_link_libraries(poisson common ${DEPLIBS_C})
+
 # We want to link this as a C program
-set_target_properties(poisson PROPERTIES LINKER_LANGUAGE C)
-
-target_link_libraries(poisson-cpp common ${DEPLIBS_C})
-
-set_target_properties(poisson-cpp PROPERTIES LINGER_LANGUAGE CXX)
+# set_target_properties(poisson PROPERTIES LINKER_LANGUAGE C)
 
 
 ## FORTRAN, WHICH WILL NOT BE USED ##
