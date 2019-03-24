@@ -16,7 +16,7 @@
 #define PI 3.14159265358979323846
 #define true 1
 #define false 0
-
+ 
 typedef double real;
 //typedef int bool;
 
