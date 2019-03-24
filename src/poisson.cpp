@@ -63,6 +63,7 @@ int main(int argc, char **argv)
      * Grid points are generated with constant mesh size on both x- and y-axis.
      */
     real *grid = mk_1D_array(n+1, false);
+    /*#pragma omp parallel for*/
     for (size_t i = 0; i < n+1; i++) {
         grid[i] = i * h;
     }
@@ -78,14 +79,14 @@ int main(int argc, char **argv)
     }
 
     /*
-     * Allocate the matrices b and bt which will be used for storing value of
+     * Allocate the matrices b and bt which will be used for storing values of
      * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
      */
     real **b = mk_2D_array(m, m, false);
     real **bt = mk_2D_array(m, m, false);
 
     /*
-     * This vector will holds coefficients of the Discrete Sine Transform (DST)
+     * This vector will hold coefficients of the Discrete Sine Transform (DST)
      * but also of the Fast Fourier Transform used in the FORTRAN code.
      * The storage size is set to nn = 4 * n, look at Chapter 9. pages 98-100:
      * - Fourier coefficients are complex so storage is used for the real part
@@ -94,7 +95,7 @@ int main(int argc, char **argv)
      *   DST coefficients are defined for j [[ 0, n-1 ]].
      * As explained in the Lecture notes coefficients for positive j are stored
      * first.
-     * The array is allocated once and passed as arguments to avoid doings 
+     * The array is allocated once and passed as arguments to avoid doing 
      * reallocations at each function call.
      */
     int nn = 4 * n;

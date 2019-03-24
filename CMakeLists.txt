@@ -30,7 +30,7 @@ if(ENABLE_OPENMP)
 endif()
 
 # Use C99
-set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
 
 # Send the include directories to the compiler
 include_directories(${INCLUDES})
@@ -40,10 +40,13 @@ add_library(common src/fst.f)
 
 # The C++ based poisson application
 add_executable(poisson src/poisson.cpp)
+add_executable(parallelPoisson src/parallel-poisson.cpp)
 
 target_link_libraries(poisson common ${DEPLIBS_C})
+target_link_libraries(parallelPoisson common ${DEPLIBS_C})
 
 set_target_properties(poisson PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(parallelPoisson PROPERTIES LINKER_LANGUAGE CXX)
 
 ## C, NOT USED ##
 
