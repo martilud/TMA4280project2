@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <omp.h>
 #include <mpi.h>
 
 #define PI 3.14159265358979323846
@@ -58,12 +59,16 @@ int main(int argc, char **argv)
 
     int m = n - 1;
     real h = 1.0 / n;
+#pragma omp parallel
+    {
+        printf("hello");
+    }
 
     /*
      * Grid points are generated with constant mesh size on both x- and y-axis.
      */
     real *grid = mk_1D_array(n+1, false);
-    /*#pragma omp parallel for*/
+    #pragma omp parallel for
     for (size_t i = 0; i < n+1; i++) {
         grid[i] = i * h;
     }
@@ -74,6 +79,7 @@ int main(int argc, char **argv)
      * Note that the indexing starts from zero here, thus i+1.
      */
     real *diag = mk_1D_array(m, false);
+    #pragma omp parallel for
     for (size_t i = 0; i < m; i++) {
         diag[i] = 2.0 * (1.0 - cos((i+1) * PI / n));
     }
@@ -105,6 +111,7 @@ int main(int argc, char **argv)
      * Initialize the right hand side data for a given rhs function.
      * 
      */
+    #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m; i++) {
         for (size_t j = 0; j < m; j++) {
             b[i][j] = h * h * rhs(grid[i+1], grid[j+1]);
@@ -121,10 +128,12 @@ int main(int argc, char **argv)
      * In functions fst_ and fst_inv_ coefficients are written back to the input 
      * array (first argument) so that the initial values are overwritten.
      */
+    #pragma omp parallel for
     for (size_t i = 0; i < m; i++) {
         fst_(b[i], &n, z, &nn);
     }
     transpose(bt, b, m);
+    #pragma omp parallel for
     for (size_t i = 0; i < m; i++) {
         fstinv_(bt[i], &n, z, &nn);
     }
@@ -132,6 +141,7 @@ int main(int argc, char **argv)
     /*
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
+    #pragma omp paralell for collapse(2)
     for (size_t i = 0; i < m; i++) {
         for (size_t j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
@@ -141,10 +151,12 @@ int main(int argc, char **argv)
     /*
      * Compute U = S^-1 * (S * Utilde^T) (Chapter 9. page 101 step 3)
      */
+    #pragma omp parallel for
     for (size_t i = 0; i < m; i++) {
         fst_(bt[i], &n, z, &nn);
     }
     transpose(b, bt, m);
+    #pragma omp parallel for
     for (size_t i = 0; i < m; i++) {
         fstinv_(b[i], &n, z, &nn);
     }
