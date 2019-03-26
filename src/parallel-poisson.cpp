@@ -89,6 +89,7 @@ int main(int argc, char **argv)
      * Allocate the matrices b and bt which will be used for storing values of
      * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
      */
+
     real **b = mk_2D_array(m, m, false);
     real **bt = mk_2D_array(m, m, false);
 
@@ -106,7 +107,7 @@ int main(int argc, char **argv)
      * reallocations at each function call.
      */
     int nn = 4 * n;
-    real *z = mk_1D_array(nn, false);
+    //real *z = mk_1D_array(nn, false);
     /*
      * Initialize the right hand side data for a given rhs function.
      * 
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
     /*
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
-    #pragma omp paralell for collapse(2)
+    #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m; i++) {
         for (size_t j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
