@@ -45,7 +45,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-
     /*
      *  The equation is solved on a 2D structured grid and homogeneous Dirichlet
      *  conditions are applied on the boundary:
@@ -53,6 +52,10 @@ int main(int argc, char **argv)
      *  - the number of degrees of freedom in each direction is m = n-1,
      *  - the mesh size is constant h = 1/n.
      */
+    MPI_Init(NULL,NULL);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
     int n = atoi(argv[1]);
     if ((n & (n-1)) != 0) {
       printf("n must be a power-of-two\n");
@@ -197,7 +200,7 @@ int main(int argc, char **argv)
     }
 
     printf("u_max = %e\n", u_max);
-
+    MPI_Finalize();
     return 0;
 }
 
