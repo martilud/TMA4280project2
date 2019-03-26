@@ -89,10 +89,13 @@ int main(int argc, char **argv)
      * Allocate the matrices b and bt which will be used for storing values of
      * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
      */
-
-    real **b = mk_2D_array(m, m, false);
-    real **bt = mk_2D_array(m, m, false);
-
+    int local_size = 0;
+    for (int i = rank; i < m; i+=size){
+       local_size++;
+    }
+    real **b = mk_2D_array(local_size, m, false);
+    real **bt = mk_2D_array(local_size, m, false);
+    
     /*
      * This vector will hold coefficients of the Discrete Sine Transform (DST)
      * but also of the Fast Fourier Transform used in the FORTRAN code.
@@ -113,7 +116,7 @@ int main(int argc, char **argv)
      * 
      */
     #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < m; i++) {
+    for (size_t i = rank; i < m; i+=size) {
         for (size_t j = 0; j < m; j++) {
             b[i][j] = h * h * rhs(grid[i+1], grid[j+1]);
         }
@@ -133,7 +136,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (size_t i = 0; i < m; i++) {
+        for (size_t i = rank; i < m; i+=size) {
             fst_(b[i], &n, z_local, &nn);
         }
     }
@@ -142,8 +145,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-
-        for (size_t i = 0; i < m; i++) {
+        for (size_t i = rank; i < m; i+=size) {
             fstinv_(bt[i], &n, z_local, &nn);
         }
     }
@@ -152,7 +154,8 @@ int main(int argc, char **argv)
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
     #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < m; i++) {
+
+    for (size_t i = rank; i < m; i+=size) {
         for (size_t j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
         }
@@ -165,7 +168,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (size_t i = 0; i < m; i++) {
+        for (size_t i = rank; i < m; i+=size) {
             fst_(bt[i], &n, z_local, &nn);
         }
     }
@@ -174,8 +177,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-
-        for (size_t i = 0; i < m; i++) {
+        for (size_t i = rank; i < m; i+=size) {
             fstinv_(b[i], &n, z_local, &nn);
         }
     }
