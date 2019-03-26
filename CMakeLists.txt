@@ -44,7 +44,7 @@ add_library(common src/fst.f)
 add_executable(poisson src/poisson.cpp)
 add_executable(parallelPoisson src/parallel-poisson.cpp)
 
-target_link_libraries(poisson common ${DEPLIBS_C})
+target_link_libraries(poisson common ${DEPLIBS_CXX})
 target_link_libraries(parallelPoisson common ${DEPLIBS_CXX})
 
 set_target_properties(poisson PROPERTIES LINKER_LANGUAGE CXX)
