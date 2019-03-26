@@ -2,7 +2,6 @@ project(poisson)
 
 cmake_minimum_required(VERSION 2.6)
 
-enable_language(C)
 enable_language(CXX)
 enable_language(Fortran)
 
@@ -17,8 +16,7 @@ endif()
 if(MPI_FOUND)
   add_definitions(-DHAVE_MPI=1)
   set(INCLUDES ${INCLUDES} ${MPI_INCLUDE_PATH})
-  #set(DEPLIBS_C ${DEPLIBS_C} ${MPI_C_LIBRARIES})
-  set(DEPLIBS_CXX ${DEPLIBS_CXX} ${MPI_C_LIBRAIES})
+  set(DEPLIBS_CXX ${DEPLIBS_CXX} ${MPI_C_LIBRARIES})
   set(DEPLIBS_F ${DEPLIBS_F} ${MPI_Fortran_LIBRARIES})
 endif()
 
@@ -26,13 +24,9 @@ if(ENABLE_OPENMP)
   find_package(OpenMP)
   if(OPENMP_FOUND)
     add_definitions(-DHAVE_OPENMP=1)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -std=c++11 -Wall -Wextra -Wpedantic")
   endif()
 endif()
-
-# Use C99
-set(CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
 
 # Send the include directories to the compiler
 include_directories(${INCLUDES})
