@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
 #include <math.h>
 #include <omp.h>
 #include <mpi.h>
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+
     /*
      *  The equation is solved on a 2D structured grid and homogeneous Dirichlet
      *  conditions are applied on the boundary:
@@ -59,10 +61,6 @@ int main(int argc, char **argv)
 
     int m = n - 1;
     real h = 1.0 / n;
-#pragma omp parallel
-    {
-        printf("hello");
-    }
 
     /*
      * Grid points are generated with constant mesh size on both x- and y-axis.
@@ -106,7 +104,6 @@ int main(int argc, char **argv)
      */
     int nn = 4 * n;
     real *z = mk_1D_array(nn, false);
-
     /*
      * Initialize the right hand side data for a given rhs function.
      * 
@@ -128,14 +125,23 @@ int main(int argc, char **argv)
      * In functions fst_ and fst_inv_ coefficients are written back to the input 
      * array (first argument) so that the initial values are overwritten.
      */
-    #pragma omp parallel for
-    for (size_t i = 0; i < m; i++) {
-        fst_(b[i], &n, z, &nn);
+    #pragma omp parallel
+    {
+        real *z_local = mk_1D_array(nn, false);
+        #pragma omp for 
+        for (size_t i = 0; i < m; i++) {
+            fst_(b[i], &n, z_local, &nn);
+        }
     }
     transpose(bt, b, m);
-    #pragma omp parallel for
-    for (size_t i = 0; i < m; i++) {
-        fstinv_(bt[i], &n, z, &nn);
+    #pragma omp parallel
+    {
+        real *z_local = mk_1D_array(nn, false);
+        #pragma omp for 
+
+        for (size_t i = 0; i < m; i++) {
+            fstinv_(bt[i], &n, z_local, &nn);
+        }
     }
 
     /*
@@ -151,15 +157,33 @@ int main(int argc, char **argv)
     /*
      * Compute U = S^-1 * (S * Utilde^T) (Chapter 9. page 101 step 3)
      */
-    #pragma omp parallel for
-    for (size_t i = 0; i < m; i++) {
-        fst_(bt[i], &n, z, &nn);
+    #pragma omp parallel
+    {
+        real *z_local = mk_1D_array(nn, false);
+        #pragma omp for 
+        for (size_t i = 0; i < m; i++) {
+            fst_(bt[i], &n, z_local, &nn);
+        }
     }
     transpose(b, bt, m);
-    #pragma omp parallel for
-    for (size_t i = 0; i < m; i++) {
-        fstinv_(b[i], &n, z, &nn);
+    #pragma omp parallel
+    {
+        real *z_local = mk_1D_array(nn, false);
+        #pragma omp for 
+
+        for (size_t i = 0; i < m; i++) {
+            fstinv_(b[i], &n, z_local, &nn);
+        }
     }
+    ////#pragma omp parallel for
+    //for (size_t i = 0; i < m; i++) {
+    //    fst_(bt[i], &n, z, &nn);
+    //}
+    //transpose(b, bt, m);
+    ////#pragma omp parallel for
+    //for (size_t i = 0; i < m; i++) {
+    //    fstinv_(b[i], &n, z, &nn);
+    //}
 
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
