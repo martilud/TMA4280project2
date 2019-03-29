@@ -10,10 +10,17 @@ int main(int argc, char **argv) {
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 	
 	// Set up matrix-parameters
-	int M = 10;
+	int M = 9;
 	int local_N = M/size;
 	if (rank < M % size) local_N++;
 	
+	// Local start colomn, NB, not important!!
+	int local_start_N = 0;
+	for (int i = 0; i < rank; i++) {
+		local_start_N += M/size;
+		if (i < M % size) local_start_N++;
+	}
+
 	// Create send and recieve buffers
 	double a[M][local_N];
 	double b[M][local_N];
@@ -31,14 +38,14 @@ int main(int argc, char **argv) {
 		sdispls[i] = sdispls[i-1] + sendcounts[i-1];
 	}
 
-
-	// Fill a with semi-unique numbers
+	
+	// Fill a with increasing numbers row by row
 	for (int i = 0; i < M; i++)
 		for (int j = 0; j < local_N; j++)
-			a[i][j] = i*9 + j + rank*10; 
+			a[i][j] = i*M + j + local_start_N; 
 	
 	// Print a at rank i for reference:
-	if (rank == 1) {
+	if (rank == 35) {
 		std::cout << "a and b from rank: " << rank << std::endl << std::endl << "a:" << std::endl;
 		for (int i = 0; i < M; i++) {
 			for (int j = 0; j < local_N; j++) {
@@ -51,8 +58,28 @@ int main(int argc, char **argv) {
 	// Let the magic happen
 	MPI_Alltoallv(&a[0][0], sendcounts, sdispls, MPI_DOUBLE, &b[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
 	
+	// Transpose the "blocks" of recieved data
+	int block_M, current_i = 0;
+	for (int block_idx = 0; block_idx < size; block_idx++) {
+		block_M = sendcounts[block_idx] / local_N;
+		double temp[block_M * local_N];
+		for (int i = 0; i < block_M; i++) {
+			for (int j = 0; j < local_N; j++) {
+				// transpose into temp buffer:
+				temp[j + local_N*i] = b[current_i+i][j];
+			}
+		}
+		for (int j = 0; j < local_N; j++) {
+			for (int i = 0; i < block_M; i++) {
+				// Saving temp buffer into b buffer:
+				b[current_i + i][j] = temp[i + j * block_M];
+			}
+		}
+		current_i += block_M;
+	}
+
 	// Print b to check result
-	if (rank == 1) {
+	if (rank == 0) {
 		std::cout << std::endl << "b, which should be transpose: " << std::endl;
 		for (int i = 0; i < M; i++) {
 			for (int j = 0; j < local_N; j++) {
@@ -66,5 +93,4 @@ int main(int argc, char **argv) {
 	MPI_Finalize();
 	return 0;
 }
-
 
