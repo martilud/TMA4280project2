@@ -1,0 +1,3 @@
+alias sc2="cd ~/TMA4280project2/build"
+alias scpp="vim ../src/parallel-poisson.cpp"
+alias mscpp="scpp && make && clear && mpirun -np 4 ./parallelPoisson 128"

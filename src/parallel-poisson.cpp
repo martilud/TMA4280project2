@@ -1,4 +1,4 @@
-/**
+/*
  * C++ program to solve the two-dimensional Poisson equation on
  * a unit square using one-dimensional eigenvalue decompositions
  * and fast sine transforms.
@@ -178,15 +178,9 @@ int main(int argc, char **argv)
             fstinv_(b[i], &n, z_local, &nn);
         }
     }
-    ////#pragma omp parallel for
-    //for (size_t i = 0; i < m; i++) {
-    //    fst_(bt[i], &n, z, &nn);
-    //}
-    //transpose(b, bt, m);
-    ////#pragma omp parallel for
-    //for (size_t i = 0; i < m; i++) {
-    //    fstinv_(b[i], &n, z, &nn);
-    //}
+
+
+
 
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
