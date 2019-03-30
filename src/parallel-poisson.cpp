@@ -70,7 +70,7 @@ int main(int argc, char **argv)
      */
     real *grid = mk_1D_array(n+1, false);
     #pragma omp parallel for
-    for (size_t i = 0; i < n+1; i++) {
+    for (int i = 0; i < n+1; i++) {
         grid[i] = i * h;
     }
 
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
      */
     real *diag = mk_1D_array(m, false);
     #pragma omp parallel for
-    for (size_t i = 0; i < m; i++) {
+    for (int i = 0; i < m; i++) {
         diag[i] = 2.0 * (1.0 - cos((i+1) * PI / n));
     }
 
@@ -106,14 +106,14 @@ int main(int argc, char **argv)
      * reallocations at each function call.
      */
     int nn = 4 * n;
-    real *z = mk_1D_array(nn, false);
+    //real *z = mk_1D_array(nn, false);
     /*
      * Initialize the right hand side data for a given rhs function.
      * 
      */
     #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < m; i++) {
-        for (size_t j = 0; j < m; j++) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < m; j++) {
             b[i][j] = h * h * rhs(grid[i+1], grid[j+1]);
         }
     }
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (size_t i = 0; i < m; i++) {
+        for (int i = 0; i < m; i++) {
             fst_(b[i], &n, z_local, &nn);
         }
     }
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
 
-        for (size_t i = 0; i < m; i++) {
+        for (int i = 0; i < m; i++) {
             fstinv_(bt[i], &n, z_local, &nn);
         }
     }
@@ -150,9 +150,9 @@ int main(int argc, char **argv)
     /*
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
-    #pragma omp paralell for collapse(2)
-    for (size_t i = 0; i < m; i++) {
-        for (size_t j = 0; j < m; j++) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
         }
     }
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (size_t i = 0; i < m; i++) {
+        for (int i = 0; i < m; i++) {
             fst_(bt[i], &n, z_local, &nn);
         }
     }
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
 
-        for (size_t i = 0; i < m; i++) {
+        for (int i = 0; i < m; i++) {
             fstinv_(b[i], &n, z_local, &nn);
         }
     }
@@ -193,8 +193,8 @@ int main(int argc, char **argv)
      * norm.
      */
     double u_max = 0.0;
-    for (size_t i = 0; i < m; i++) {
-        for (size_t j = 0; j < m; j++) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < m; j++) {
             u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
         }
     }
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
  */
 
 real rhs(real x, real y) {
-    return 1;
+	return 1;
 }
 
 /*
