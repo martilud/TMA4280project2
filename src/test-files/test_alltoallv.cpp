@@ -1,6 +1,8 @@
 #include <iostream>
 #include <mpi.h>
 
+double fill_matrix(int i, int j, int M, int local_start_n); 
+
 double *mk_1D_array(size_t n, bool zero)
 {
     if (zero) {
@@ -54,6 +56,10 @@ int main(int argc, char **argv) {
 	int rank, size;
 	MPI_Comm_size (MPI_COMM_WORLD, &size);
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+
+	if (rank == 0) {
+		std::cout << "Excecuting unit test" << std::endl;
+	}
 	
 	// Set up matrix-parameters
 	int M = 10;
@@ -79,7 +85,6 @@ int main(int argc, char **argv) {
 		sendcounts[i] = M/size;
 		if (i < M % size) sendcounts[i]++;
 		sendcounts[i] *= local_N;
-		if (rank == 0) std::cout << sendcounts[i] << " ";
 	}
 
 	sdispls[0] = 0;
@@ -91,12 +96,9 @@ int main(int argc, char **argv) {
 	// Fill a with increasing numbers row by row
 	for (int i = 0; i < local_N; i++)
 		for (int j = 0; j < M; j++)
-			b[i][j] = i + j*M + local_start_N; 
+			b[i][j] = fill_matrix(i, j, M, local_start_N); // i + j*M + local_start_N; 
 	
-    if(rank == 0) {
-        std::cout << "original matrix" << std::endl;
-        printMatrix(b, local_N, M);
-    }
+
 
 	double *temp = mk_1D_array(local_N * M, 0);
 	int block_M, current_j = 0, count = 0;	
@@ -125,15 +127,35 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	bool correct = true;
+	
+	for (int i = 0; i < local_N; i++) {
+		for (int j = 0; j < M; j++) {
+			if (bt[i][j] == fill_matrix(j, i, M, local_start_N)) {
+				correct = false;
+			}
+		}
+	}
+	bool recieve_correct;
+	MPI_Reduce(&correct, &recieve_correct, 1, MPI_LOGICAL, MPI_LAND, 0, MPI_COMM_WORLD);
+	if (rank == 0) {
+		if (recieve_correct) {
+			std::cout << "Unit test is succesfull!!" << std::endl;
+		}
+		else {
+			std::cout << "Unit test failed!!" << std::endl; 
+		}
+	}
 
-	// Print b to check result
-	if (rank == 2){
-        std::cout << "transposed matrix" << std::endl; 
-        printMatrix(bt,local_N,M); 
-    }
+
 
 	// Finito!!
 	MPI_Finalize();
 	return 0;
 }
+
+
+double fill_matrix(int i, int j, int M, int local_start_n) {
+	return (i + j*M + local_start_n);
+}	
 
