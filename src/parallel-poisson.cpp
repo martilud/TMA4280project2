@@ -99,7 +99,7 @@ int main(int argc, char **argv)
         local_start_N += m/size;
         if (i < m % size) local_start_N++;
     }
-
+	std::cout << "rank = " << rank << " local_n_Start = " << local_start_N << std::endl;
     
     real **b = mk_2D_array(local_N, m, false);
     real **bt = mk_2D_array(local_N, m, false);
@@ -281,7 +281,7 @@ int main(int argc, char **argv)
 	double global_u_max = 0.0;
 	MPI_Reduce(&u_max, &global_u_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-	if (rank == 0) printf("u_max = %e\n", u_max);
+	if (rank == 0) printf("u_max = %e\n", global_u_max);
     
 	MPI_Finalize();
 	return 0;
