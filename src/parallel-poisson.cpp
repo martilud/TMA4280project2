@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     int local_start_N = 0;
     for (int i = 0; i < rank; i++) {
         local_start_N += m/size;
-        if (i < M % size) local_start_N++;
+        if (i < m % size) local_start_N++;
     }
 
     
@@ -165,8 +165,37 @@ int main(int argc, char **argv)
         }
     }
 
-    //parallel_transpose(bt, b, m); //TODO
+	double *temp = mk_1D_array(local_N * m, 0);
+	int block_M, current_j = 0, count = 0;	
+	for (int block_idx = 0; block_idx < size; block_idx++) {
+		block_M = sendcounts[block_idx] / local_N;
+		for (int i = 0; i < local_N; i++) {
+			for (int j = 0; j < block_M; j++) {
+				temp[count++] = b[i][j + current_j];
+			}
+		}
+		current_j += block_M;
+	}
 
+
+	
+	double *recieve_temp = mk_1D_array(local_N * m, 0);
+
+
+	// Let the magic happen
+	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+	
+	// Unpack buffer
+	count = 0;
+	for (int j= 0; j < m; j++) {
+		for (int i = 0; i < local_N; i++) {
+			bt[i][j] = recieve_temp[count++];
+		}
+	}
+
+
+	
+    
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
@@ -182,7 +211,7 @@ int main(int argc, char **argv)
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
-            bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
+            bt[i][j] = bt[i][j] / (diag[local_start_N + i] + diag[j]);
         }
     }
 
@@ -197,7 +226,33 @@ int main(int argc, char **argv)
             fst_(bt[i], &n, z_local, &nn);
         }
     }
-    //transpose(b, bt, m); //TODO
+   
+
+	current_j = 0; 
+	count = 0;	
+	for (int block_idx = 0; block_idx < size; block_idx++) {
+		block_M = sendcounts[block_idx] / local_N;
+		for (int i = 0; i < local_N; i++) {
+			for (int j = 0; j < block_M; j++) {
+				temp[count++] = bt[i][j + current_j];
+			}
+		}
+		current_j += block_M;
+	}
+
+
+	
+	// Let the magic happen
+	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+	
+	// Unpack buffer
+	count = 0;
+	for (int j= 0; j < m; j++) {
+		for (int i = 0; i < local_N; i++) {
+			b[i][j] = recieve_temp[count++];
+		}
+	}
+
 
 
     #pragma omp parallel
@@ -215,17 +270,21 @@ int main(int argc, char **argv)
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
      * norm.
-     */ //TODO
+     */
     double u_max = 0.0;
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
             u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
         }
     }
 
-    printf("u_max = %e\n", u_max);
-    MPI_Finalize();
-    return 0;
+	double global_u_max = 0.0;
+	MPI_Reduce(&u_max, &global_u_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) printf("u_max = %e\n", u_max);
+    
+	MPI_Finalize();
+	return 0;
 }
 
 /*
