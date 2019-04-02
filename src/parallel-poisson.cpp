@@ -126,9 +126,9 @@ int main(int argc, char **argv)
      * 
      */
     #pragma omp parallel for collapse(2)
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < local_N; j++) {
-            b[i][j] = h * h * rhs(grid[i+1], grid[local_start_N+j+1]);
+    for (int i = 0; i < local_N; i++) {
+        for (int j = 0; j < m; j++) {
+            b[i][j] = h * h * rhs(grid[local_start_N+i+1], grid[j+1]); // TODO
         }
     }
 
@@ -164,31 +164,9 @@ int main(int argc, char **argv)
             fst_(b[i], &n, z_local, &nn);
         }
     }
-    //transpose(bt, b, m);
-    MPI_Alltoallv(&b[0][0], sendcounts, sdispls, MPI_DOUBLE, &bt[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
 
-    // Transpose the "blocks" of recieved data
-    int block_M, current_i = 0;
-    for (int block_idx = 0; block_idx < size; block_idx++) {
-        block_M = sendcounts[block_idx] / local_N;
-        double temp[block_M * local_N];
-        for (int i = 0; i < block_M; i++) {
-            for (int j = 0; j < local_N; j++) {
-                // transpose into temp buffer:
-                temp[j + local_N*i] = bt[current_i+i][j];
-            }
-        }
-        for (int j = 0; j < local_N; j++) {
-            for (int i = 0; i < block_M; i++) {
-                // Saving temp buffer into b buffer:
-                bt[current_i + i][j] = temp[i + j * block_M];
-            }
-        }
-        current_i += block_M;
-    }
-    
-    
-    
+    //parallel_transpose(bt, b, m); //TODO
+
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
@@ -202,7 +180,7 @@ int main(int argc, char **argv)
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
     #pragma omp parallel for collapse(2)
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
         }
@@ -215,38 +193,18 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fst_(bt[i], &n, z_local, &nn);
         }
     }
-    //transpose(b, bt, m);
-    MPI_Alltoallv(&bt[0][0], sendcounts, sdispls, MPI_DOUBLE, &b[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+    //transpose(b, bt, m); //TODO
 
-    // Transpose the "blocks" of recieved data
-    int block_M, current_i = 0;
-    for (int block_idx = 0; block_idx < size; block_idx++) {
-        block_M = sendcounts[block_idx] / local_N;
-        double temp[block_M * local_N];
-        for (int i = 0; i < block_M; i++) {
-            for (int j = 0; j < local_N; j++) {
-                // transpose into temp buffer:
-                temp[j + local_N*i] = b[current_i+i][j];
-            }
-        }
-        for (int j = 0; j < local_N; j++) {
-            for (int i = 0; i < block_M; i++) {
-                // Saving temp buffer into b buffer:
-                b[current_i + i][j] = temp[i + j * block_M];
-            }
-        }
-        current_i += block_M;
-    }
 
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fstinv_(b[i], &n, z_local, &nn);
         }
     }
@@ -257,7 +215,7 @@ int main(int argc, char **argv)
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
      * norm.
-     */
+     */ //TODO
     double u_max = 0.0;
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < m; j++) {

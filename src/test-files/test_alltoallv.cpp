@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
 
 
 	// Print b to check result
-	if (rank == 0){
+	if (rank == 2){
         std::cout << "transposed matrix" << std::endl; 
         printMatrix(bt,local_N,M); 
     }
