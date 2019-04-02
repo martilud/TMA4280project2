@@ -89,13 +89,23 @@ int main(int argc, char **argv)
      * Allocate the matrices b and bt which will be used for storing values of
      * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
      */
-    int local_size = 0;
-    for (int i = rank; i < m; i+=size){
-       local_size++;
-    }
-    real **b = mk_2D_array(local_size, m, false);
-    real **bt = mk_2D_array(local_size, m, false);
+
+    int local_N = m/size;
+    if (rank < m % size) local_N++;
     
+    // Local start colomn, NB, not important!!
+    int local_start_N = 0;
+    for (int i = 0; i < rank; i++) {
+        local_start_N += m/size;
+        if (i < M % size) local_start_N++;
+    }
+
+    
+    real **b = mk_2D_array(local_N, m, false);
+    real **bt = mk_2D_array(local_N, m, false);
+    
+    
+
     /*
      * This vector will hold coefficients of the Discrete Sine Transform (DST)
      * but also of the Fast Fourier Transform used in the FORTRAN code.
@@ -116,11 +126,24 @@ int main(int argc, char **argv)
      * 
      */
     #pragma omp parallel for collapse(2)
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
-
-            b[i][j] = h * h * rhs(grid[i+1], grid[j+1]);
+            b[i][j] = h * h * rhs(grid[local_start_N+i+1], grid[j+1]); // TODO
         }
+    }
+
+
+    // Find send and displacement buffers
+    int sendcounts[size], sdispls[size];
+    for (int i = 0; i < size; i++) {
+        sendcounts[i] = m/size;
+        if (i < m % size) sendcounts[i]++;
+        sendcounts[i] *= local_N;
+    }
+ 
+    sdispls[0] = 0;
+    for (int i = 1; i < size; i++) {
+        sdispls[i] = sdispls[i-1] + sendcounts[i-1];
     }
 
     /*
@@ -137,16 +160,18 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fst_(b[i], &n, z_local, &nn);
         }
     }
-    transpose(bt, b, m);
+
+    //parallel_transpose(bt, b, m); //TODO
+
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fstinv_(bt[i], &n, z_local, &nn);
         }
     }
@@ -155,7 +180,7 @@ int main(int argc, char **argv)
      * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
      */
     #pragma omp parallel for collapse(2)
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[i] + diag[j]);
         }
@@ -168,16 +193,18 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fst_(bt[i], &n, z_local, &nn);
         }
     }
-    transpose(b, bt, m);
+    //transpose(b, bt, m); //TODO
+
+
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fstinv_(b[i], &n, z_local, &nn);
         }
     }
@@ -188,7 +215,7 @@ int main(int argc, char **argv)
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
      * norm.
-     */
+     */ //TODO
     double u_max = 0.0;
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < m; j++) {
