@@ -39,8 +39,9 @@ double **mk_2D_array(size_t n1, size_t n2, bool zero)
 }
 
 void printMatrix(double **mat, int N, int M){
-    for (int i = 0; i < N; i++) {
-		for (int j = 0; j < M; j++) {
+    for (int j = 0; j < M; j++) {
+		for (int i = 0; i < N; i++) {
+			if (mat[i][j] < 10) std::cout << 0;	
 			std::cout << mat[i][j] << " ";
 		}
 		std::cout << std::endl;
@@ -55,7 +56,7 @@ int main(int argc, char **argv) {
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 	
 	// Set up matrix-parameters
-	int M = 9;
+	int M = 10;
 	int local_N = M/size;
 	if (rank < M % size) local_N++;
 	
@@ -64,6 +65,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < rank; i++) {
 		local_start_N += M/size;
 		if (i < M % size) local_start_N++;
+		
 	}
 
 	// Create send and recieve buffers
@@ -77,6 +79,7 @@ int main(int argc, char **argv) {
 		sendcounts[i] = M/size;
 		if (i < M % size) sendcounts[i]++;
 		sendcounts[i] *= local_N;
+		if (rank == 0) std::cout << sendcounts[i] << " ";
 	}
 
 	sdispls[0] = 0;
@@ -88,47 +91,42 @@ int main(int argc, char **argv) {
 	// Fill a with increasing numbers row by row
 	for (int i = 0; i < local_N; i++)
 		for (int j = 0; j < M; j++)
-			b[i][j] = i*M + j + local_start_N; 
+			b[i][j] = i + j*M + local_start_N; 
 	
     if(rank == 0) {
         std::cout << "original matrix" << std::endl;
         printMatrix(b, local_N, M);
     }
-	// Print a at rank i for reference:
-	if (rank == 35) {
-		std::cout << "a and b from rank: " << rank << std::endl << std::endl << "a:" << std::endl;
-		for (int i = 0; i < M; i++) {
-			for (int j = 0; j < local_N; j++) {
-				std::cout << b[i][j] << " ";
+
+	double *temp = mk_1D_array(local_N * M, 0);
+	int block_M, current_j = 0, count = 0;	
+	for (int block_idx = 0; block_idx < size; block_idx++) {
+		block_M = sendcounts[block_idx] / local_N;
+		for (int i = 0; i < local_N; i++) {
+			for (int j = 0; j < block_M; j++) {
+				temp[count++] = b[i][j + current_j];
 			}
-			std::cout << std::endl;
+		}
+		current_j += block_M;
+	}
+
+
+	
+	double *recieve_temp = mk_1D_array(local_N * M, 0);
+
+
+	// Let the magic happen
+	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+
+	count = 0;
+	for (int j= 0; j < M; j++) {
+		for (int i = 0; i < local_N; i++) {
+			bt[i][j] = recieve_temp[count++];
 		}
 	}
-	
-	// Let the magic happen
-	MPI_Alltoallv(&b[0][0], sendcounts, sdispls, MPI_DOUBLE, &bt[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
-	
-	//Transpose the "blocks" of recieved data
-	//int block_M, current_i = 0;
-	//for (int block_idx = 0; block_idx < size; block_idx++) {
-	//	block_M = sendcounts[block_idx] / local_N;
-	//	double temp[block_M * local_N];
-	//	for (int i = 0; i < block_M; i++) {
-	//		for (int j = 0; j < local_N; j++) {
-	//			// transpose into temp buffer:
-	//			temp[j + local_N*i] = bt[current_i+i][j];
-	//		}
-	//	}
-	//	for (int j = 0; j < local_N; j++) {
-	//		for (int i = 0; i < block_M; i++) {
-	//			// Saving temp buffer into b buffer:
-	//			bt[current_i + i][j] = temp[i + j * block_M];
-	//		}
-	//	}
-	//	current_i += block_M;
-	//}
 
-	//// Print b to check result
+
+	// Print b to check result
 	if (rank == 0){
         std::cout << "transposed matrix" << std::endl; 
         printMatrix(bt,local_N,M); 
