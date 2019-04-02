@@ -89,13 +89,23 @@ int main(int argc, char **argv)
      * Allocate the matrices b and bt which will be used for storing values of
      * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
      */
-    int local_size = 0;
-    for (int i = rank; i < m; i+=size){
-       local_size++;
-    }
-    real **b = mk_2D_array(local_size, m, false);
-    real **bt = mk_2D_array(local_size, m, false);
+
+    int local_N = m/size;
+    if (rank < m % size) local_N++;
     
+    // Local start colomn, NB, not important!!
+    int local_start_N = 0;
+    for (int i = 0; i < rank; i++) {
+        local_start_N += m/size;
+        if (i < M % size) local_start_N++;
+    }
+
+    
+    real **b = mk_2D_array(local_N, m, false);
+    real **bt = mk_2D_array(local_N, m, false);
+    
+    
+
     /*
      * This vector will hold coefficients of the Discrete Sine Transform (DST)
      * but also of the Fast Fourier Transform used in the FORTRAN code.
@@ -117,10 +127,23 @@ int main(int argc, char **argv)
      */
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < m; i++) {
-        for (int j = 0; j < m; j++) {
-
-            b[i][j] = h * h * rhs(grid[i+1], grid[j+1]);
+        for (int j = 0; j < local_N; j++) {
+            b[i][j] = h * h * rhs(grid[i+1], grid[local_start_N+j+1]);
         }
+    }
+
+
+    // Find send and displacement buffers
+    int sendcounts[size], sdispls[size];
+    for (int i = 0; i < size; i++) {
+        sendcounts[i] = m/size;
+        if (i < m % size) sendcounts[i]++;
+        sendcounts[i] *= local_N;
+    }
+ 
+    sdispls[0] = 0;
+    for (int i = 1; i < size; i++) {
+        sdispls[i] = sdispls[i-1] + sendcounts[i-1];
     }
 
     /*
@@ -137,16 +160,40 @@ int main(int argc, char **argv)
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fst_(b[i], &n, z_local, &nn);
         }
     }
-    transpose(bt, b, m);
+    //transpose(bt, b, m);
+    MPI_Alltoallv(&b[0][0], sendcounts, sdispls, MPI_DOUBLE, &bt[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    // Transpose the "blocks" of recieved data
+    int block_M, current_i = 0;
+    for (int block_idx = 0; block_idx < size; block_idx++) {
+        block_M = sendcounts[block_idx] / local_N;
+        double temp[block_M * local_N];
+        for (int i = 0; i < block_M; i++) {
+            for (int j = 0; j < local_N; j++) {
+                // transpose into temp buffer:
+                temp[j + local_N*i] = bt[current_i+i][j];
+            }
+        }
+        for (int j = 0; j < local_N; j++) {
+            for (int i = 0; i < block_M; i++) {
+                // Saving temp buffer into b buffer:
+                bt[current_i + i][j] = temp[i + j * block_M];
+            }
+        }
+        current_i += block_M;
+    }
+    
+    
+    
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
         #pragma omp for 
-        for (int i = 0; i < m; i++) {
+        for (int i = 0; i < local_N; i++) {
             fstinv_(bt[i], &n, z_local, &nn);
         }
     }
@@ -172,7 +219,29 @@ int main(int argc, char **argv)
             fst_(bt[i], &n, z_local, &nn);
         }
     }
-    transpose(b, bt, m);
+    //transpose(b, bt, m);
+    MPI_Alltoallv(&bt[0][0], sendcounts, sdispls, MPI_DOUBLE, &b[0][0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    // Transpose the "blocks" of recieved data
+    int block_M, current_i = 0;
+    for (int block_idx = 0; block_idx < size; block_idx++) {
+        block_M = sendcounts[block_idx] / local_N;
+        double temp[block_M * local_N];
+        for (int i = 0; i < block_M; i++) {
+            for (int j = 0; j < local_N; j++) {
+                // transpose into temp buffer:
+                temp[j + local_N*i] = b[current_i+i][j];
+            }
+        }
+        for (int j = 0; j < local_N; j++) {
+            for (int i = 0; i < block_M; i++) {
+                // Saving temp buffer into b buffer:
+                b[current_i + i][j] = temp[i + j * block_M];
+            }
+        }
+        current_i += block_M;
+    }
+
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
