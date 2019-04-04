@@ -39,9 +39,10 @@ int main(int argc, char **argv)
 {
     if (argc < 2) {
         printf("Usage:\n");
-        printf("  poisson n\n\n");
+        printf("    poisson n\n\n");
         printf("Arguments:\n");
-        printf("  n: the problem size (must be a power of 2)\n");
+        printf("    n: the problem size (must be a power of 2)\n");
+        printf("    test: 'utest' for unit test or 'vtest' for verification test")
         return 1;
     }
 
