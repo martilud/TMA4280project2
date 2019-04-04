@@ -215,15 +215,19 @@ int main(int argc, char **argv)
     /*
      * Compute maximal value of solution for convergence analysis in L_\infty
      * norm.
-     */ //TODO
+     */
+
     double u_max = 0.0;
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
             u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
         }
     }
-
-    printf("u_max = %e\n", u_max);
+    double global_u_max = 0.0;
+    MPI_Reduce(&u_max,&global_u_max,1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
+    if (rank == 0){
+        printf("u_max = %e\n", u_max);
+    }
     MPI_Finalize();
     return 0;
 }
