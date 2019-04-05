@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Header linea
+if [ -f ../results/results.txt ]; 
+then
+    echo deleting old file
+    rm ../results/results.txt
+fi
+echo mpiprocs threads n maxerror time >> results.txt
+p=2 # Number of OpenMP threads
+for m in `seq 1 1 4` # MPI Processes
+do
+    n=8
+    for k in `seq 1 1 8` # Almost n^k 
+    do
+        if [ $n -ge $p ]
+        then
+            result=$(mpirun -np $m ../build/parallelPoisson -n $n -p 1 -t v)
+            echo $result >> results.txt
+        fi
+        n=$(($n*2))
+    done
+    p=$(($p*2))
+done
+mv results.txt ../results/results.txt
