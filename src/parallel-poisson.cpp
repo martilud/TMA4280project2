@@ -337,7 +337,7 @@ int main(int argc, char **argv)
     }
     else if(t == 'u'){
         if (rank == 0){
-            std::cout << "======== RUNNING UNIT TEST ========" << std::endl; 
+            std::cout << "========= RUNNING UNIT TEST = ========" << std::endl; 
         }
         double u_max = 0.0;
         for (int i = 0; i < local_N; i++) {
