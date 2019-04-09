@@ -61,6 +61,9 @@ int main(int argc, char **argv)
             }
             else if (std::strcmp("-p", argv[i]) == 0){
                 p = atoi(argv[i+1]);
+		if(p == 0){
+			p = omp_get_max_threads();
+		}
             }
             else if(std::strcmp("-t", argv[i]) == 0){
                 t = *argv[i+1];
