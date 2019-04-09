@@ -10,4 +10,4 @@ cmake ..
 make  
 ./poisson 128
 ```
-
+https://www.hpc.ntnu.no/display/hpc/Running+Jobs

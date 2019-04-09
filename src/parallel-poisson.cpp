@@ -19,8 +19,8 @@
 #include <cstring>
 
 #define PI 3.14159265358979323846
-#define true 1
-#define false 0
+//#define true 1
+//#define false 0
 
 typedef double real;
 //typedef int bool;
@@ -29,10 +29,12 @@ typedef double real;
 real *mk_1D_array(size_t n, bool zero);
 real **mk_2D_array(size_t n1, size_t n2, bool zero);
 void transpose(real **bt, real **b, size_t m);
-real rhs1(real x, real y);
+real rhs1();
 real rhs2(real x, real y);
 real rhs3(int x_grid, int y_grid, int m);
 real analytical(real x, real y);
+bool utest_transpose(int rank, int size); 
+bool utest_result(int rank, double **b, int local_N, int  m);
 
 // Functions implemented in FORTRAN in fst.f and called from C.
 // The trailing underscore comes from a convention for symbol names, called name
@@ -60,6 +62,9 @@ int main(int argc, char **argv)
             }
             else if (std::strcmp("-p", argv[i]) == 0){
                 p = atoi(argv[i+1]);
+		if(p == 0){
+			p = omp_get_max_threads();
+		}
             }
             else if(std::strcmp("-t", argv[i]) == 0){
                 t = *argv[i+1];
@@ -163,7 +168,7 @@ int main(int argc, char **argv)
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < local_N; i++) {
             for (int j = 0; j < m; j++) {
-                b[i][j] = h * h * rhs1(grid[local_start_N+i+1], grid[j+1]);
+                b[i][j] = h * h * rhs1(); //grid[local_start_N+i+1], grid[j+1]);
             }
         }
     }
@@ -185,7 +190,11 @@ int main(int argc, char **argv)
     }
 
     // Find send and displacement buffers
-    int sendcounts[size], sdispls[size];
+	int *sendcounts = (int *)malloc(size * sizeof(int));
+	int *sdispls = (int *)malloc(size * sizeof(int));
+
+    //int *sendcounts =            [size]
+	//int *sdispls[size];
     for (int i = 0; i < size; i++) {
         sendcounts[i] = m/size;
         if (i < m % size) sendcounts[i]++;
@@ -337,25 +346,27 @@ int main(int argc, char **argv)
     }
     else if(t == 'u'){
         if (rank == 0){
-            std::cout << "========= RUNNING UNIT TEST = ========" << std::endl; 
+            std::cout << "\n========= RUNNING UNIT TESTS =========\n" << std::endl; 
         }
-        double u_max = 0.0;
-        for (int i = 0; i < local_N; i++) {
-            for (int j = 0; j < m; j++) {
-                u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
-            }
-        }
-        double global_u_max = 0.0;
-        MPI_Reduce(&u_max,&global_u_max,1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
-        if (rank == 0){
-            printf("u_max = %e\n", global_u_max);
-            if (fabs(global_u_max) < 1){
-                std::cout << "Solution is within required tolerance \n======== UNIT TEST SUCCESSFUL ========" << std::endl;
-            }
-            else{
-                std::cout << "Solution is NOT within required tolerance \n======= UNIT TEST FAILED ========" << std::endl;
-            }
-        }
+		bool pass = true;
+
+		// Test if transpose logic works
+		if (!utest_transpose(rank, size))
+			pass = false;
+
+		// Test if program returns the same as the serial programe	
+		if (!utest_result(rank, b, local_N, m))
+			pass = false;
+		
+		//std::cout << "pass = " << pass << std::endl;
+		if (rank == 0) {
+			if (pass)
+				std::cout << "\n======== UNIT TESTS SUCCESSFUL ========" << std::endl;
+			else
+				std::cout << "\n========= UNIT TESTS FAILED!  =========" << std::endl;
+		}
+
+
         MPI_Finalize();
         return 0;
 
@@ -396,7 +407,7 @@ int main(int argc, char **argv)
  * Other functions can be defined to swtich between problem definitions.
  */
 
-real rhs1(real x, real y) {
+real rhs1() {
     // Function 1
 	return 1;
 }
@@ -484,3 +495,136 @@ real **mk_2D_array(size_t n1, size_t n2, bool zero)
     }
     return ret;
 }
+
+
+
+///////////////////////////  UNIT TEST: TEST IF TRANSPOSE LOGIC WORKS ////////////////////////////////
+
+bool utest_transpose(int rank, int size) {
+	if (rank == 0)
+		std::cout << "Excecuting transpose unit test ..." << std::endl;
+	
+	// Set up matrix-parameters
+	int M = 10;
+	int local_N = M/size;
+	if (rank < M % size) local_N++;
+	
+	// Local start colomn, NB, not important!!
+	int local_start_N = 0;
+	for (int i = 0; i < rank; i++) {
+		local_start_N += M/size;
+		if (i < M % size) local_start_N++;
+		
+	}
+
+	// Create send and recieve buffers
+	double **b = (double **)malloc(local_N * sizeof(double *));
+	double **bt = (double **)malloc(local_N * sizeof(double *));
+	b[0] = (double *)malloc(local_N * M * sizeof(double));
+	bt[0] = (double *)malloc(local_N * M * sizeof(double));
+    for (int i = 1; i < local_N; i++) {
+        b[i] = b[i-1] + M;
+        bt[i] = bt[i-1] + M;
+    }
+
+	// Find send and displacement buffers
+	int *sendcounts = (int *)malloc(size * sizeof(int));
+	int *sdispls = (int *)malloc(size * sizeof(int));
+	for (int i = 0; i < size; i++) {
+		sendcounts[i] = M/size;
+		if (i < M % size) sendcounts[i]++;
+		sendcounts[i] *= local_N;
+	}
+
+	sdispls[0] = 0;
+	for (int i = 1; i < size; i++) {
+		sdispls[i] = sdispls[i-1] + sendcounts[i-1];
+	}
+
+	
+	// Fill a with increasing numbers row by row
+	for (int i = 0; i < local_N; i++)
+		for (int j = 0; j < M; j++)
+			b[i][j] = i + j*M + local_start_N;	
+
+	// Creating a send and recieve temporary 1D array for wrapping/unwrapping the data
+	double *temp = (double *)malloc(local_N * M * sizeof(double));
+	double *recieve_temp = (double *)malloc(local_N * M * sizeof(double));
+
+	int block_M, current_j = 0, count = 0;	
+	for (int block_idx = 0; block_idx < size; block_idx++) {
+		block_M = sendcounts[block_idx] / local_N;
+		for (int i = 0; i < local_N; i++) {
+			for (int j = 0; j < block_M; j++) {
+				temp[count++] = b[i][j + current_j];
+			}
+		}
+		current_j += block_M;
+	}
+
+	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
+
+	count = 0;
+	for (int j= 0; j < M; j++)
+		for (int i = 0; i < local_N; i++)
+			bt[i][j] = recieve_temp[count++];
+	
+	int correct = 1;
+	int recieve_correct;
+	for (int i = 0; i < local_N; i++) {
+		for (int j = 0; j < M; j++) {
+			if (bt[i][j] != j + M * (i + local_start_N)){
+				correct = 0;
+			}
+		}
+	}
+
+	MPI_Allreduce(&correct, &recieve_correct, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+
+	if (recieve_correct == size) {
+		if (rank == 0)
+			std::cout << "Test matrix is sucessfully transposed!" << std::endl;
+		return true;
+	}
+	else {
+		if (rank == 0)
+			std::cout << "Transpose unit test failed" << std::endl; 
+		return false;
+	}
+	
+}
+
+
+////////////////////////  UNIT TEST: TEST IF PARALLEL CODE PRODUCES SAME RESULT AS SERIAL /////////////////////////////
+
+bool utest_result(int rank, double **b, int local_N, int m){
+	if (rank == 0)
+	std::cout << "\nExcecuting unit test: \ncomparing parallel and serial results ..." << std::endl;
+
+    double u_max = 0.0;
+    for (int i = 0; i < local_N; i++) {
+        for (int j = 0; j < m; j++) {
+            u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
+        }
+    }
+    double global_u_max = 0.0;
+    MPI_Allreduce(&u_max, &global_u_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD); 
+
+    if (rank == 0){
+		printf("u_max = %e\n", global_u_max);
+    }
+	
+	if (fabs(global_u_max) < 1){
+		if (rank == 0)
+            std::cout << "Solution is within required tolerance!" << std::endl;
+		return true;
+	}
+	else{
+		if (rank == 0) 
+			std::cout << "Solution is NOT within required tolerance" << std::endl;
+		return false;
+    }
+}
+
+
