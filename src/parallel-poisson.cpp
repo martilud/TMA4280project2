@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
+#include <fstream>
 #include <math.h>
 #include <omp.h>
 #include <mpi.h>
@@ -30,6 +31,7 @@ real **mk_2D_array(size_t n1, size_t n2, bool zero);
 void transpose(real **bt, real **b, size_t m);
 real rhs1(real x, real y);
 real rhs2(real x, real y);
+real rhs3(int x_grid, int y_grid, int m);
 real analytical(real x, real y);
 
 // Functions implemented in FORTRAN in fst.f and called from C.
@@ -45,20 +47,11 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    //if (argc < 2) {
-    //    printf("Usage:\n");
-    //    printf("    poisson n\n\n");
-    //    printf("Arguments:\n");
-    //    printf("    n: the problem size (must be a power of 2)\n");
-    //    printf("    p: number of OpenMP threads");
-    //    printf("    t: 'u' for unit test or 'v' for verification test");
-    //    return 1;
-    //}
-
     int n = 128;
     int p = omp_get_max_threads();
     omp_set_num_threads(omp_get_max_threads());
-    char t = 'm';
+    char t = 'm'; // default value
+    int f = 1;
 
     for (int i= 1; i < argc; i++){
         if (i < argc - 1){
@@ -71,10 +64,11 @@ int main(int argc, char **argv)
             else if(std::strcmp("-t", argv[i]) == 0){
                 t = *argv[i+1];
             }
+            else if(std::strcmp("-f", argv[i]) == 0){
+                f = atoi(argv[i+1]);
+            }
         }
-    }
-
-    
+    } 
     if ((n & (n-1)) != 0) {
       printf("n must be a power-of-two\n");
       return 2;
@@ -89,8 +83,12 @@ int main(int argc, char **argv)
     }
     if (t == 'u'){
         // Unit test, choosing fixed values
+        f = 1;
         n = 128;
         p = 4;
+    }
+    else if(t == 'v'){
+        f = 2;
     }
 
     real starttime = omp_get_wtime();
@@ -157,12 +155,11 @@ int main(int argc, char **argv)
      * reallocations at each function call.
      */
     int nn = 4 * n;
-    //real *z = mk_1D_array(nn, false);
+
     /*
      * Initialize the right hand side data for a given rhs function.
-     * 
      */
-    if (t == 'u'){
+    if (f == 1){
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < local_N; i++) {
             for (int j = 0; j < m; j++) {
@@ -170,7 +167,7 @@ int main(int argc, char **argv)
             }
         }
     }
-    else{
+    else if (f == 2){
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < local_N; i++) {
             for (int j = 0; j < m; j++) {
@@ -178,7 +175,14 @@ int main(int argc, char **argv)
             }
         }
     }
-
+    else{
+        #pragma omp parallel for collapse(2)
+        for (int i = 0; i < local_N; i++) {
+            for (int j = 0; j < m; j++) {
+                b[i][j] = h * h * rhs3(local_start_N+i+1, j+1, m);
+            }
+        }
+    }
 
     // Find send and displacement buffers
     int sendcounts[size], sdispls[size];
@@ -331,10 +335,6 @@ int main(int argc, char **argv)
         MPI_Finalize();
         return 0;  
     }
-    /*
-     * Compute maximal value of solution for convergence analysis in L_\infty
-     * norm.
-     */
     else if(t == 'u'){
         if (rank == 0){
             std::cout << "======== RUNNING UNIT TEST ========" << std::endl; 
@@ -360,6 +360,20 @@ int main(int argc, char **argv)
         return 0;
 
     }
+    else if(t == 'r' && size == 1){
+        std::ofstream solution;
+        solution.open("solution.txt");
+        for (int i = 0; i < m; i++){
+            for (int j = 0; j < m; j++){
+                solution << b[i][j] << '\t';
+            }
+            solution << std::endl;
+        }
+        solution.close();
+        std::cout << "Successfully wrote to file solution.txt" << std::endl;
+        MPI_Finalize();
+        return 0;
+    }
     
     double u_max = 0.0;
     for (int i = 0; i < local_N; i++) {
@@ -367,6 +381,7 @@ int main(int argc, char **argv)
             u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
         }
     }
+
     double global_u_max = 0.0;
     MPI_Reduce(&u_max,&global_u_max,1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
     if (rank == 0){
@@ -389,6 +404,23 @@ real rhs1(real x, real y) {
 real rhs2(real x, real y){
     // Function 2
     return 5 * PI * PI *sin(PI * x) * sin(2 * PI * y); 
+}
+real rhs3(int x_grid, int y_grid, int m){
+    if (x_grid == m/4 && y_grid == m/4){
+        return m*m;
+    }
+    else if(x_grid == 3*m/4 && y_grid == 3*m/4){
+        return m*m;
+    }
+    else if(x_grid == m/4 && y_grid == 3*m/4){
+        return -m*m;
+    }
+    else if(x_grid == 3*m/4 && y_grid == m/4){
+        return -m*m;
+    }
+    else{
+        return 0.0;
+    }
 }
 
 real analytical(real x, real y){
