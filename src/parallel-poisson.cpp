@@ -282,6 +282,7 @@ int main(int argc, char **argv)
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
+		std::cout << "Hello from: " << omp_get_thread_num() << std::endl; 
         #pragma omp for 
         for (int i = 0; i < local_N; i++) {
             fst_(bt[i], &n, z_local, &nn);

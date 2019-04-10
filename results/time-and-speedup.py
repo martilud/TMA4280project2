@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-n = np.array([64, 256, 1024, 4096])**2
+n = np.array([64, 256, 1024, 4096])
+p = np.array([1,2,4,6,9,12,18, 36])
 
 time_vs_np = np.array([
 [0.0118445, 0.218464, 4.04543, 74.0699],
@@ -22,76 +23,110 @@ time_vs_p = np.array([
 [0.00233850, 0.0335307, 0.585164, 10.4454],
 [0.00222564, 0.0266532, 0.454868, 8.1042],
 [0.00300185, 0.0341911, 0.484426, 8.83917],
-[0.00364528, 0.026544, 0.329556, 5.81617]
-])
-
-
+[0.00364528, 0.026544, 0.329556, 5.81617] ]) 
 
 speedup_np = time_vs_np[0, :] / time_vs_np
 speedup_p = time_vs_p[0, :] / time_vs_p
 
-fig1, (ax11, ax12) = plt.subplots(ncols=2)
-fig2, (ax21, ax22) = plt.subplots(ncols=2)
+efficiency_np = speedup_np / p[:, None]
+efficiency_p = speedup_p / p[:, None]
 
-ax11.loglog(n, time_vs_np[0, :], label='np = 1')
-ax11.loglog(n, time_vs_np[1, :], label='np = 2')
-ax11.loglog(n, time_vs_np[2, :], label='np = 4')
-ax11.loglog(n, time_vs_np[3, :], label='np = 6')
-ax11.loglog(n, time_vs_np[4, :], label='np = 9')
-ax11.loglog(n, time_vs_np[5, :], label='np = 12')
-ax11.loglog(n, time_vs_np[6, :], label='np = 18')
-ax11.loglog(n, time_vs_np[7, :], label='np = 36')
+fig1, ax1 = plt.subplots()
+fig2, ax2 = plt.subplots()
+fig3, (ax3_1, ax3_2) = plt.subplots(ncols=2)
+fig4, (ax4_1, ax4_2) = plt.subplots(ncols=2)
 
-ax11.legend()
-ax11.set_xlabel('n^2')
-ax11.set_ylabel('Time [s]')
-ax11.set_title('Time vs. number of processes')
-ax11.grid()
+ax1.loglog(n, time_vs_np[0, :], label='#p = 1', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[1, :], label='#p = 2', linestyle='-', marker='x') 
+ax1.loglog(n, time_vs_np[2, :], label='#p = 4', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[3, :], label='#p = 6', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[4, :], label='#p = 9', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[5, :], label='#p = 12', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[6, :], label='#p = 18', linestyle='-', marker='x')
+ax1.loglog(n, time_vs_np[7, :], label='#p = 36', linestyle='-', marker='x')
 
-ax12.plot(n, speedup_np[0, :], label='np = 1')
-ax12.plot(n, speedup_np[1, :], label='np = 2')
-ax12.plot(n, speedup_np[2, :], label='np = 4')
-ax12.plot(n, speedup_np[3, :], label='np = 6')
-ax12.plot(n, speedup_np[4, :], label='np = 9')
-ax12.plot(n, speedup_np[5, :], label='np = 12')
-ax12.plot(n, speedup_np[6, :], label='np = 18')
-ax12.plot(n, speedup_np[7, :], label='np = 36')
+ax1.legend()
+ax1.set_title('Time vs. #processes for #threads=1')
+ax1.set_xlabel('n')
+ax1.set_ylabel('Time [s]')
+ax1.grid()
 
-ax12.legend()
-ax12.set_xlabel('n^2')
-ax12.set_ylabel('Speedup')
-ax12.set_title('Speedup vs. number of processes')
-ax12.grid()
-
-
-ax21.plot(n, time_vs_p[0, :], label='p = 1')
-ax21.plot(n, time_vs_p[1, :], label='p = 2')
-ax21.plot(n, time_vs_p[2, :], label='p = 4')
-ax21.plot(n, time_vs_p[3, :], label='p = 6')
-ax21.plot(n, time_vs_p[4, :], label='p = 9')
-ax21.plot(n, time_vs_p[5, :], label='p = 12')
-ax21.plot(n, time_vs_p[6, :], label='p = 18')
-ax21.plot(n, time_vs_p[7, :], label='p = 36')
-
-ax21.legend()
-ax21.set_xlabel('n^2')
-ax21.set_ylabel('Time [s]')
-ax21.set_title('Time vs. number of threads')
+ax2.loglog(n, time_vs_p[0, :], label='#t = 1', linestyle='-', marker='x')
+ax2.loglog(n, time_vs_p[1, :], label='#t = 2', linestyle='-', marker='x') 
+ax2.loglog(n, time_vs_p[2, :], label='#t = 4', linestyle='-', marker='x')
+ax2.loglog(n, time_vs_p[3, :], label='#t = 6', linestyle='-', marker='x')
+ax2.loglog(n, time_vs_p[4, :], label='#t = 9', linestyle='-', marker='x')
+ax2.loglog(n, time_vs_p[5, :], label='#t = 12', linestyle='-', marker='x') 
+ax2.loglog(n, time_vs_p[6, :], label='#t = 18', linestyle='-', marker='x') 
+ax2.loglog(n, time_vs_p[7, :], label='#t = 36', linestyle='-', marker='x')  
 
 
-ax22.plot(n, speedup_p[0, :], label='p = 1')
-ax22.plot(n, speedup_p[1, :], label='p = 2')
-ax22.plot(n, speedup_p[2, :], label='p = 4')
-ax22.plot(n, speedup_p[3, :], label='p = 6')
-ax22.plot(n, speedup_p[4, :], label='p = 9')
-ax22.plot(n, speedup_p[5, :], label='p = 12')
-ax22.plot(n, speedup_p[6, :], label='p = 18')
-ax22.plot(n, speedup_p[7, :], label='p = 36')
+ax2.legend()
+ax2.set_xlabel('n')
+ax2.set_ylabel('Time [s]')
+ax2.set_title('Time vs. #threads for #processes=1')
+ax2.grid() 
 
-ax22.legend()
-ax22.set_xlabel('n^2')
-ax22.set_ylabel('Speedup')
-ax22.set_title('Speedup vs. number of threads')
+
+ax3_1.plot(n, speedup_np[0, :], label='#p = 1', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[1, :], label='#p = 2', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[2, :], label='#p = 4', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[3, :], label='#p = 6', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[4, :], label='#p = 9', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[5, :], label='#p = 12', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[6, :], label='#p = 18', linestyle='-', marker='x')
+ax3_1.plot(n, speedup_np[7, :], label='#p = 36', linestyle='-', marker='x')
+
+ax3_1.legend()
+ax3_1.grid()
+ax3_1.set_xlabel('n')
+ax3_1.set_ylabel('Speedup')
+
+
+
+ax3_2.plot(n, efficiency_np[0, :], label='#p = 1', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[1, :], label='#p = 2', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[2, :], label='#p = 4', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[3, :], label='#p = 6', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[4, :], label='#p = 9', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[5, :], label='#p = 12', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[6, :], label='#p = 18', linestyle='-', marker='x')
+ax3_2.plot(n, efficiency_np[7, :], label='#p = 36', linestyle='-', marker='x')
+
+ax3_2.legend()
+ax3_2.grid()
+ax3_2.set_xlabel('n')
+ax3_2.set_ylabel('efficiency')
+
+ax4_1.plot(n, speedup_p[0, :], label='#t = 1', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[1, :], label='#t = 2', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[2, :], label='#t = 4', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[3, :], label='#t = 6', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[4, :], label='#t = 9', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[5, :], label='#t = 12', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[6, :], label='#t = 18', linestyle='-', marker='x')
+ax4_1.plot(n, speedup_p[7, :], label='#t = 36', linestyle='-', marker='x')
+
+ax4_1.legend()
+ax4_1.grid()
+ax4_1.set_xlabel('n')
+ax4_1.set_ylabel('Speedup')
+
+
+ax4_2.plot(n, efficiency_p[0, :], label='#p = 1', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[1, :], label='#p = 2', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[2, :], label='#p = 4', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[3, :], label='#p = 6', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[4, :], label='#p = 9', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[5, :], label='#p = 12', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[6, :], label='#p = 18', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[7, :], label='#p = 36', linestyle='-', marker='x')
+
+ax4_2.legend()
+ax4_2.grid()
+ax4_2.set_xlabel('n')
+ax4_2.set_ylabel('efficiency')
+
 
 plt.show()
 
