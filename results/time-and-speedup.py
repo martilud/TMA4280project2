@@ -67,6 +67,8 @@ ax2.set_ylabel('Time [s]')
 ax2.set_title('Time vs. #threads for #processes=1')
 ax2.grid() 
 
+n = n**2
+
 
 ax3_1.plot(n, speedup_np[0, :], label='#p = 1', linestyle='-', marker='x')
 ax3_1.plot(n, speedup_np[1, :], label='#p = 2', linestyle='-', marker='x')
@@ -79,9 +81,9 @@ ax3_1.plot(n, speedup_np[7, :], label='#p = 36', linestyle='-', marker='x')
 
 ax3_1.legend()
 ax3_1.grid()
-ax3_1.set_xlabel('n')
+ax3_1.set_xlabel(r'$n^2$')
 ax3_1.set_ylabel('Speedup')
-
+ax3_1.set_title(r'Speedup vs. $n^2$, #t=1')
 
 
 ax3_2.plot(n, efficiency_np[0, :], label='#p = 1', linestyle='-', marker='x')
@@ -95,8 +97,9 @@ ax3_2.plot(n, efficiency_np[7, :], label='#p = 36', linestyle='-', marker='x')
 
 ax3_2.legend()
 ax3_2.grid()
-ax3_2.set_xlabel('n')
-ax3_2.set_ylabel('efficiency')
+ax3_2.set_xlabel(r'$n^2$')
+ax3_2.set_ylabel('Efficiency')
+ax3_2.set_title(r'Efficiency vs. $n^2$, #t=1')
 
 ax4_1.plot(n, speedup_p[0, :], label='#t = 1', linestyle='-', marker='x')
 ax4_1.plot(n, speedup_p[1, :], label='#t = 2', linestyle='-', marker='x')
@@ -109,23 +112,25 @@ ax4_1.plot(n, speedup_p[7, :], label='#t = 36', linestyle='-', marker='x')
 
 ax4_1.legend()
 ax4_1.grid()
-ax4_1.set_xlabel('n')
+ax4_1.set_xlabel(r'$n^2$')
 ax4_1.set_ylabel('Speedup')
+ax4_1.set_title(r'Speedup vs. $n^2$, #p=1')
 
 
-ax4_2.plot(n, efficiency_p[0, :], label='#p = 1', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[1, :], label='#p = 2', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[2, :], label='#p = 4', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[3, :], label='#p = 6', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[4, :], label='#p = 9', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[5, :], label='#p = 12', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[6, :], label='#p = 18', linestyle='-', marker='x')
-ax4_2.plot(n, efficiency_p[7, :], label='#p = 36', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[0, :], label='#t = 1', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[1, :], label='#t = 2', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[2, :], label='#t = 4', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[3, :], label='#t = 6', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[4, :], label='#t = 9', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[5, :], label='#t = 12', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[6, :], label='#t = 18', linestyle='-', marker='x')
+ax4_2.plot(n, efficiency_p[7, :], label='#t = 36', linestyle='-', marker='x')
 
 ax4_2.legend()
 ax4_2.grid()
-ax4_2.set_xlabel('n')
-ax4_2.set_ylabel('efficiency')
+ax4_2.set_xlabel(r'$n^2$')
+ax4_2.set_ylabel('Efficiency')
+ax4_2.set_title(r'Efficiency vs. $n^2$, #p=1')
 
 
 plt.show()

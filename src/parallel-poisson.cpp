@@ -7,6 +7,8 @@
  * NTNU, October 2000
  * Revised, October 2001
  * Revised by Eivind Fonn, February 2015
+ 
+ * Parallelized by Martin Ludvigsen and Harald Wilhelmsen 2019
  */
 
 #include <stdlib.h>
@@ -19,22 +21,21 @@
 #include <cstring>
 
 #define PI 3.14159265358979323846
-//#define true 1
-//#define false 0
-
 typedef double real;
-//typedef int bool;
 
 // Function prototypes
 real *mk_1D_array(size_t n, bool zero);
 real **mk_2D_array(size_t n1, size_t n2, bool zero);
 void transpose(real **bt, real **b, size_t m);
-real rhs1();
-real rhs2(real x, real y);
-real rhs3(int x_grid, int y_grid, int m);
-real analytical(real x, real y);
-bool utest_transpose(int rank, int size); 
-bool utest_result(int rank, double **b, int local_N, int  m);
+
+
+// New functions
+real rhs1();															// Source function
+real rhs2(real x, real y);												// source function
+real rhs3(int x_grid, int y_grid, int m);								// Source function
+real analytical(real x, real y);										// Analytical result of RHS2 used for convergence test
+bool utest_transpose(int rank, int size); 								// Test: Creates and transposes a simple matrix
+bool utest_result(int rank, double **b, int local_N, int  m);			// Test: compares serial and parallel results
 
 // Functions implemented in FORTRAN in fst.f and called from C.
 // The trailing underscore comes from a convention for symbol names, called name
@@ -44,17 +45,20 @@ extern "C" void fstinv_(real *v, int *n, real *w, int *nn);
 
 int main(int argc, char **argv)
 {
+	// Initialize MPI
     MPI_Init(NULL,NULL);
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    int n = 128;
-    int p = omp_get_max_threads();
-    omp_set_num_threads(omp_get_max_threads());
-    char t = 'm'; // default value
-    int f = 1;
-
+	
+	// Initalize variables which may be taken in as command line parameters
+    int n = 128; 									// Problem size
+    int p = omp_get_max_threads();					// Number of threads
+    omp_set_num_threads(omp_get_max_threads());		
+    char t = 'm'; // default value					// Spesifies if there should be used a test
+    int f = 1;										// Spesifies which source function to be used
+	
+	// Reading command line parameters
     for (int i= 1; i < argc; i++){
         if (i < argc - 1){
             if (std::strcmp("-n", argv[i]) == 0){
@@ -74,6 +78,8 @@ int main(int argc, char **argv)
             }
         }
     } 
+
+	// Check if values are allowed, and setting several values
     if ((n & (n-1)) != 0) {
       printf("n must be a power-of-two\n");
       return 2;
@@ -96,74 +102,47 @@ int main(int argc, char **argv)
         f = 2;
     }
 
+	// Timing: use the elapsed wall clock time in seconds
     real starttime = omp_get_wtime();
-    /*
-     *  The equation is solved on a 2D structured grid and homogeneous Dirichlet
-     *  conditions are applied on the boundary:
-     *  - the number of grid points in each direction is n+1,
-     *  - the number of degrees of freedom in each direction is m = n-1,
-     *  - the mesh size is constant h = 1/n.
-     */
 
-    int m = n - 1;
+	
+	int m = n - 1;
     real h = 1.0 / n;
 
-    /*
-     * Grid points are generated with constant mesh size on both x- and y-axis.
-     */
     real *grid = mk_1D_array(n+1, false);
+
+	// As each grid point is independent of each other, this loop is parallelized
     #pragma omp parallel for
     for (int i = 0; i < n+1; i++) {
         grid[i] = i * h;
     }
 
-    /*
-     * The diagonal of the eigenvalue matrix of T is set with the eigenvalues
-     * defined Chapter 9. page 93 of the Lecture Notes.
-     * Note that the indexing starts from zero here, thus i+1.
-     */
+	// Again independent elements of the array, making room for parallelization
     real *diag = mk_1D_array(m, false);
     #pragma omp parallel for
     for (int i = 0; i < m; i++) {
         diag[i] = 2.0 * (1.0 - cos((i+1) * PI / n));
     }
-
-    /*
-     * Allocate the matrices b and bt which will be used for storing values of
-     * G, \tilde G^T, \tilde U^T, U as described in Chapter 9. page 101.
-     */
-
+	
+	// The columns of the main matrix is devided evenly on the ranks, in the following way
     int local_N = m/size;
     if (rank < m % size) local_N++;
     
-    // Local start colomn, NB, not important!!
+    // When the number of columns are distributed is it convinient to know the start column index in the origional matrix
     int local_start_N = 0;
     for (int i = 0; i < rank; i++) {
         local_start_N += m/size;
         if (i < m % size) local_start_N++;
     }
-    
+
+	// Then the matrix is created as n x local_N matrices on each process
     real **b = mk_2D_array(local_N, m, false);
     real **bt = mk_2D_array(local_N, m, false);
     
-    /*
-     * This vector will hold coefficients of the Discrete Sine Transform (DST)
-     * but also of the Fast Fourier Transform used in the FORTRAN code.
-     * The storage size is set to nn = 4 * n, look at Chapter 9. pages 98-100:
-     * - Fourier coefficients are complex so storage is used for the real part
-     *   and the imaginary part.
-     * - Fourier coefficients are defined for j = [[ - (n-1), + (n-1) ]] while 
-     *   DST coefficients are defined for j [[ 0, n-1 ]].
-     * As explained in the Lecture notes coefficients for positive j are stored
-     * first.
-     * The array is allocated once and passed as arguments to avoid doing 
-     * reallocations at each function call.
-     */
     int nn = 4 * n;
 
-    /*
-     * Initialize the right hand side data for a given rhs function.
-     */
+	// The local b matrix is then initialized with the given RHS function, 
+	// This prosess is also parallelizable as there is no reading and writing to the same memory location
     if (f == 1){
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < local_N; i++) {
@@ -188,34 +167,9 @@ int main(int argc, char **argv)
             }
         }
     }
-
-    // Find send and displacement buffers
-	int *sendcounts = (int *)malloc(size * sizeof(int));
-	int *sdispls = (int *)malloc(size * sizeof(int));
-
-    //int *sendcounts =            [size]
-	//int *sdispls[size];
-    for (int i = 0; i < size; i++) {
-        sendcounts[i] = m/size;
-        if (i < m % size) sendcounts[i]++;
-        sendcounts[i] *= local_N;
-    }
- 
-    sdispls[0] = 0;
-    for (int i = 1; i < size; i++) {
-        sdispls[i] = sdispls[i-1] + sendcounts[i-1];
-    }
-
-    /*
-     * Compute \tilde G^T = S^-1 * (S * G)^T (Chapter 9. page 101 step 1)
-     * Instead of using two matrix-matrix products the Discrete Sine Transform
-     * (DST) is used.
-     * The DST code is implemented in FORTRAN in fst.f and can be called from C.
-     * The array zz is used as storage for DST coefficients and internally for 
-     * FFT coefficients in fst_ and fstinv_.
-     * In functions fst_ and fst_inv_ coefficients are written back to the input 
-     * array (first argument) so that the initial values are overwritten.
-     */
+	
+	// Then the fst_ is runned on the columns of b.
+	// As the columns are independent, it is possible to parallelize as long as each OpenMP thread have its local z (memmory buffer)
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
@@ -225,10 +179,41 @@ int main(int argc, char **argv)
         }
     }
 
+
+	///////////////////////////  Transposing ///////////////////////////////
+	// This is the place where the local matrix b is transposed
+	// This part may require some more ellaborative comments
+
+    // Allocate send and displacement buffers
+	int *sendcounts = (int *)malloc(size * sizeof(int));
+	int *sdispls = (int *)malloc(size * sizeof(int));
+	
+	// The goal is to wrap data into contegeous "blocks" of memory, and then send the blocks to the right process
+	// The blocks are size: 
+	// 		number of rows: local_N for process i,
+	// 		number of columns: local_N for this process
+	// This size is svaed into the sendcounts
+    for (int i = 0; i < size; i++) {
+        sendcounts[i] = m/size;
+        if (i < m % size) sendcounts[i]++;
+        sendcounts[i] *= local_N;
+    }
+ 	
+	// The displacement is found relative the start of the first element to be send
+    sdispls[0] = 0;
+    for (int i = 1; i < size; i++) {
+        sdispls[i] = sdispls[i-1] + sendcounts[i-1];
+    }
+
+	// To make sure the data is contigeous in memory, the content of b is wrapped into a temporary storage buffer in the coorect order
 	double *temp = mk_1D_array(local_N * m, 0);
-	int block_M, current_j = 0, count = 0;	
+	int block_M, current_j = 0, count = 0;
+
+	// The process is done "blockwise," where each block represents the data going to a spesific porcess
 	for (int block_idx = 0; block_idx < size; block_idx++) {
 		block_M = sendcounts[block_idx] / local_N;
+		
+		// Then for each block, wrapping the data of b columnwise into the temp buffer:
 		for (int i = 0; i < local_N; i++) {
 			for (int j = 0; j < block_M; j++) {
 				temp[count++] = b[i][j + current_j];
@@ -238,15 +223,16 @@ int main(int argc, char **argv)
 	}
 
 
-	
+	// MPI does not support aliasing, meaning that another temorary buffer must be used to recieve the data
 	double *recieve_temp = mk_1D_array(local_N * m, 0);
 
 
 	// Let the magic happen
 	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
 	
-	// Unpack buffer
-	//count = 0;
+	// Then unwrapping the temprary buffer back at the bt matrix. This is done row wise to simultaniously transposing the data.
+	// As it turns out, this process is parallelizable as each reading or writing to memory is done only once within the loops
+	// and the reading is from one buffer, and the writing is done into the another data container
     #pragma omp parallel for collapse(2)
 	for (int j = 0; j < m; j++) {
 		for (int i = 0; i < local_N; i++) {
@@ -254,9 +240,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-
+	//////////////////////// Finnished transposing //////////////////////////
 	
-    
+    // Again by making sure each process have a local memory buffer z, the fstinv_ is parallelizable in the following way
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
@@ -265,31 +251,27 @@ int main(int argc, char **argv)
             fstinv_(bt[i], &n, z_local, &nn);
         }
     }
-
-    /*
-     * Solve Lambda * \tilde U = \tilde G (Chapter 9. page 101 step 2)
-     */
+	
+	// As the opperation done within each loop is independent on the other opperations, this loops is parallelizable in the following way
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
             bt[i][j] = bt[i][j] / (diag[local_start_N + i] + diag[j]);
         }
     }
-
-    /*
-     * Compute U = S^-1 * (S * Utilde^T) (Chapter 9. page 101 step 3)
-     */
+	
+	// Parallelized by creating a local memory buffer again
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
-		std::cout << "Hello from: " << omp_get_thread_num() << std::endl; 
         #pragma omp for 
         for (int i = 0; i < local_N; i++) {
             fst_(bt[i], &n, z_local, &nn);
         }
     }
    
-
+	// Tranposing back. It is still possible to reuse the send count and disp from the previous transponation,
+	// meaning that one can directly start wrapping the data into the old buffer
 	current_j = 0; 
 	count = 0;	
 	for (int block_idx = 0; block_idx < size; block_idx++) {
@@ -301,24 +283,20 @@ int main(int argc, char **argv)
 		}
 		current_j += block_M;
 	}
-
-
+	// This two following blocks have equal logic as the first transponation
 	
 	// Let the magic happen
 	MPI_Alltoallv(&temp[0], sendcounts, sdispls, MPI_DOUBLE, &recieve_temp[0], sendcounts, sdispls, MPI_DOUBLE, MPI_COMM_WORLD);
 	
-	// Unpack buffer
-	//count = 0;
     #pragma omp parallel for collapse(2)
 	for (int j= 0; j < m; j++) {
 		for (int i = 0; i < local_N; i++) {
-			//b[i][j] = recieve_temp[count++];
 			b[i][j] = recieve_temp[j*local_N + i];
 		}
 	}
 
 
-
+	// Then by making the local memory buffer the ftsinv_ can again be parallelized
     #pragma omp parallel
     {
         real *z_local = mk_1D_array(nn, false);
@@ -329,6 +307,14 @@ int main(int argc, char **argv)
     }
 
 
+
+	////////////////////////// Main program finnished /////////////////////////////////////
+	// The rest of the code is used to process the data found, either by doing tests, 
+	// writing the results to file or finding the maximum u
+
+
+
+	// verification test: test if the numerical answer is close to the analytical answer known for the second RHS function
     if (t == 'v'){
         double e_max = 0.0;
         for (int i = 0; i < local_N; i++) {
@@ -336,6 +322,8 @@ int main(int argc, char **argv)
                 e_max = e_max > fabs(b[i][j] - analytical(grid[local_start_N+i+1], grid[j+1])) ? e_max : fabs(b[i][j] - analytical(grid[local_start_N+i+1], grid[j+1]));
             }
         }
+
+		// Reducing the result to process 0, and printing:
         double global_e_max = 0.0;
         MPI_Reduce(&e_max, &global_e_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
         if (rank == 0){
@@ -345,6 +333,8 @@ int main(int argc, char **argv)
         MPI_Finalize();
         return 0;  
     }
+
+	// Unit testing
     else if(t == 'u'){
         if (rank == 0){
             std::cout << "\n========= RUNNING UNIT TESTS =========\n" << std::endl; 
@@ -359,7 +349,6 @@ int main(int argc, char **argv)
 		if (!utest_result(rank, b, local_N, m))
 			pass = false;
 		
-		//std::cout << "pass = " << pass << std::endl;
 		if (rank == 0) {
 			if (pass)
 				std::cout << "\n======== UNIT TESTS SUCCESSFUL ========" << std::endl;
@@ -372,6 +361,8 @@ int main(int argc, char **argv)
         return 0;
 
     }
+
+	// Writing u to file. To avoid complication with parallel I/O, this is only done if the number of processes = 1
     else if(t == 'r' && size == 1){
         std::ofstream solution;
         solution.open("solution.txt");
@@ -387,6 +378,8 @@ int main(int argc, char **argv)
         return 0;
     }
     
+
+	// Finding the max u, which by reduction is stored at process 0 and printed
     double u_max = 0.0;
     for (int i = 0; i < local_N; i++) {
         for (int j = 0; j < m; j++) {
@@ -399,6 +392,8 @@ int main(int argc, char **argv)
     if (rank == 0){
         printf("u_max = %e\n", global_u_max);
     }
+
+	// Then finalizing the MPI and ending the program
     MPI_Finalize();
     return 0;
 }
