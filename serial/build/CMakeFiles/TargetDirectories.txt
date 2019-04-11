@@ -1,0 +1,5 @@
+/home/harald/TMA4280project2/serial/build/CMakeFiles/edit_cache.dir
+/home/harald/TMA4280project2/serial/build/CMakeFiles/rebuild_cache.dir
+/home/harald/TMA4280project2/serial/build/CMakeFiles/poisson-f.dir
+/home/harald/TMA4280project2/serial/build/CMakeFiles/common.dir
+/home/harald/TMA4280project2/serial/build/CMakeFiles/poisson.dir
