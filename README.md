@@ -19,4 +19,6 @@ cmake ..
 make  
 mpirun -np 4 ./parallelPoisson -n 128 -p 4 -t v
 ```
+
+To get more information on how to use the programe on a super computer
 https://www.hpc.ntnu.no/display/hpc/Running+Jobs
