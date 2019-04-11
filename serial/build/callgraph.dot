@@ -1,0 +1,20 @@
+digraph "callgraph" {
+  F55ab0ac9a960 [label="fst_\n8 338 992 684"];
+  F55ab0ac9ad30 [label="fast_sine_\n16 627 557 606"];
+  F55ab0ac9b180 [label="fft_\n15 923 465 580"];
+  F55ab0ac9b980 [label="__cos_fma\n3 333 220 440"];
+  F55ab0ac9bdb0 [label="__sin_fma\n3 411 279 432"];
+  F55ab0ac9cf00 [label="main\n16 773 751 930"];
+  F55ab0ac9efc0 [label="fstinv_\n8 288 736 786"];
+  F55ab0aca5320 [label="_start\n16 773 751 930"];
+  F55ab0aca5870 [label="(below main)\n16 773 751 930"];
+  F55ab0ac9a960 -> F55ab0ac9ad30 [weight=3,label="8 338 906 752 (2 046x)"];
+  F55ab0ac9ad30 -> F55ab0ac9b180 [weight=3,label="15 923 465 580 (4 092x)"];
+  F55ab0ac9b180 -> F55ab0ac9b980 [weight=3,label="3 333 220 440 (46 092 288x)"];
+  F55ab0ac9b180 -> F55ab0ac9bdb0 [weight=3,label="3 411 279 432 (46 092 288x)"];
+  F55ab0ac9cf00 -> F55ab0ac9a960 [weight=3,label="8 338 992 684 (2 046x)"];
+  F55ab0ac9cf00 -> F55ab0ac9efc0 [weight=3,label="8 288 736 786 (2 046x)"];
+  F55ab0ac9efc0 -> F55ab0ac9ad30 [weight=3,label="8 288 650 854 (2 046x)"];
+  F55ab0aca5320 -> F55ab0aca5870 [weight=3,label="16 773 751 930 (1x)"];
+  F55ab0aca5870 -> F55ab0ac9cf00 [weight=3,label="16 773 751 930 (1x)"];
+}
