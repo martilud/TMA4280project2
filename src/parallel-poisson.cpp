@@ -330,8 +330,6 @@ int main(int argc, char **argv)
             real endtime = omp_get_wtime();
             std::cout << size << '\t' << p << '\t' << n << '\t' << global_e_max << '\t' << endtime-starttime << std::endl;
         } 
-        MPI_Finalize();
-        return 0;  
     }
 
 	// Unit testing
@@ -357,8 +355,6 @@ int main(int argc, char **argv)
 		}
 
 
-        MPI_Finalize();
-        return 0;
 
     }
 
@@ -374,27 +370,29 @@ int main(int argc, char **argv)
         }
         solution.close();
         std::cout << "Successfully wrote to file solution.txt" << std::endl;
-        MPI_Finalize();
-        return 0;
     }
-    
-
-	// Finding the max u, which by reduction is stored at process 0 and printed
-    double u_max = 0.0;
-    for (int i = 0; i < local_N; i++) {
-        for (int j = 0; j < m; j++) {
-            u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
+    else{
+	    // Finding the max u, which by reduction is stored at process 0 and printed
+        double u_max = 0.0;
+        for (int i = 0; i < local_N; i++) {
+            for (int j = 0; j < m; j++) {
+                u_max = u_max > fabs(b[i][j]) ? u_max : fabs(b[i][j]);
+            }
         }
-    }
 
-    double global_u_max = 0.0;
-    MPI_Reduce(&u_max,&global_u_max,1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
-    if (rank == 0){
-        printf("u_max = %e\n", global_u_max);
-    }
+        double global_u_max = 0.0;
+        MPI_Reduce(&u_max,&global_u_max,1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); 
+        if (rank == 0){
+            printf("u_max = %e\n", global_u_max);
+        }
 
-	// Then finalizing the MPI and ending the program
+	    // Then finalizing the MPI and ending the program
+    }
     MPI_Finalize();
+    free(b);
+    free(bt);
+    free(temp);
+    free(recieve_temp);
     return 0;
 }
 
